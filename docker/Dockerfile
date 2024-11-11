@@ -17,7 +17,9 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
-# install composer
+RUN pecl install redis && docker-php-ext-enable redis
+
+# Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 RUN useradd -u $uid -ms /bin/bash -g www-data $user
