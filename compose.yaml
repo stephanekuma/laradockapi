@@ -118,11 +118,15 @@ services:
       - "traefik.http.routers.mailpit.rule=Host(`${MAIL_HOSTNAME}`)"
       - "traefik.http.routers.mailpit.entrypoints=web"
       - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+    volumes:
+      - mailpit_data:/data
     networks:
       - api_example
 
 volumes:
   mysql_data:
+    driver: local
+  mailpit_data:
     driver: local
 
 networks:
