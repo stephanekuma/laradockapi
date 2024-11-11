@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-use Illuminate\Http\Request;
+use App\Helpers\Routes\RouteHelper;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum'])->get('/user', fn(Request $request) => $request->user());
+Route::prefix('v1')->group(function (): void {
+    RouteHelper::includeRouteFiles(directory: __DIR__ . '/v1');
+});
