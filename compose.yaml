@@ -1,0 +1,130 @@
+services:
+  traefik:
+    image: "traefik:v2.0"
+    container_name: "traefik"
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - ./letsencrypt:/letsencrypt
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker.exposedbydefault=false"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    networks:
+      - api_example
+
+  app:
+    platform: linux/amd64
+    build:
+      args:
+        - user=api_example_user
+        - uid=1000
+      context: .
+      dockerfile: ./docker/Dockerfile
+    image: laravel11_api_example
+    container_name: app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    depends_on:
+      - mysql
+    networks:
+      - api_example
+
+  nginx:
+    platform: linux/amd64
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "6162:80"
+    depends_on:
+      - app
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/:/etc/nginx/conf.d
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx.rule=Host(`${APP_HOST}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.nginx.middlewares=portainer-prefix"
+      - "traefik.http.middlewares.portainer-prefix.stripprefix.prefixes=/"
+      - "traefik.http.middlewares.portainer-prefix.stripprefix.forceslash=false"
+    networks:
+      - api_example
+
+  mysql:
+    platform: linux/amd64
+    image: mysql:latest
+    container_name: mysql
+    restart: unless-stopped
+    ports:
+      - "3337:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - api_example
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.1-apache
+    container_name: phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8383:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_PASSWORD}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`${PMA_HOST}`)"
+      - "traefik.http.routers.phpmyadmin.entrypoints=web"
+    depends_on:
+      - mysql
+    networks:
+      - api_example
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "7379:6379"
+    networks:
+      - api_example
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailpit.rule=Host(`${MAIL_HOSTNAME}`)"
+      - "traefik.http.routers.mailpit.entrypoints=web"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+    networks:
+      - api_example
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  api_example:
+    driver: bridge
