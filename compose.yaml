@@ -28,8 +28,8 @@ services:
       args:
         - user=api_example_user
         - uid=1000
-      context: .
-      dockerfile: ./docker/Dockerfile
+      context: docker/php
+      dockerfile: Dockerfile
     image: laravel11_api_example
     container_name: app
     restart: unless-stopped
@@ -56,6 +56,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.nginx.rule=Host(`${APP_HOST}`) && PathPrefix(`/`)"
+      - "traefik.http.routers.nginx.entrypoints=websecure"
+      - "traefik.http.routers.nginx.tls.certresolver=letsencrypt"
       - "traefik.http.routers.nginx.middlewares=portainer-prefix"
       - "traefik.http.middlewares.portainer-prefix.stripprefix.prefixes=/"
       - "traefik.http.middlewares.portainer-prefix.stripprefix.forceslash=false"
@@ -93,7 +95,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.phpmyadmin.rule=Host(`${PMA_HOST}`)"
-      - "traefik.http.routers.phpmyadmin.entrypoints=web"
+      - "traefik.http.routers.phpmyadmin.entrypoints=websecure"
+      - "traefik.http.routers.phpmyadmin.tls.certresolver=letsencrypt"
     depends_on:
       - mysql
     networks:
@@ -103,7 +106,7 @@ services:
     image: redis:7.2-alpine
     container_name: redis
     ports:
-      - "7379:6379"
+      - "6379:6379"
     networks:
       - api_example
 
@@ -116,12 +119,27 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mailpit.rule=Host(`${MAIL_HOSTNAME}`)"
-      - "traefik.http.routers.mailpit.entrypoints=web"
+      - "traefik.http.routers.mailpit.entrypoints=websecure"
+      - "traefik.http.routers.mailpit.tls.certresolver=letsencrypt"
       - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
     volumes:
       - mailpit_data:/data
     networks:
       - api_example
+
+  # Supervisor Container (schedule and queue runner)
+  supervisor:
+    build:
+      context: docker/supervisor
+      dockerfile: Dockerfile
+    container_name: supervisor
+    restart: unless-stopped
+    volumes:
+      - ./:/var/www/
+      - ./docker/supervisor/conf.d:/etc/supervisor/conf.d
+      - ./docker/supervisor/logs:/var/log
+    depends_on:
+      - app
 
 volumes:
   mysql_data:

@@ -49,7 +49,7 @@ LaradockAPI is an API built with Laravel 11, optimized for deployment in a Docke
 ## Useful Commands
 
 - Artisan:
-    
+
     ```bash
     docker compose exec app php artisan <command>
 
